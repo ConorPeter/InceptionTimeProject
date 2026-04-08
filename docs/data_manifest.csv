@@ -1,0 +1,4 @@
+Dataset,Train_Size,Test_Size,Length,Classes,Normalization,Source
+GunPoint,50,150,150,2,Z-Normalized (Verified),UCR Archive 2018
+ECG200,,,,,,
+FordA,,,,,,

@@ -1,0 +1,28 @@
+# InceptionTime Default Configuration
+# Source: InceptionTime Paper (Section 6)
+
+# Model Architecture
+model:
+  depth: 6                    # Number of Inception modules
+  bottleneck_size: 32         # Bottleneck layer size (m)
+  filter_lengths: [10, 20, 40]  # Convolution filter lengths
+  filters_per_layer: 32       # Number of filters per component
+  ensemble_size: 5            # Number of models in ensemble
+
+# Training Hyperparameters
+training:
+  optimizer: "adam"
+  learning_rate: 0.001        # Adam default
+  batch_size: 64
+  epochs: 1500                # Or until convergence
+  weight_initialization: "glorot_uniform"
+
+# Reproducibility
+random_seed: 42               # Section 4
+
+# Dataset
+dataset:
+  name: "GunPoint"
+  train_path: "data/GunPoint/GunPoint_TRAIN.tsv"
+  test_path: "data/GunPoint/GunPoint_TEST.tsv"
+  normalization: "z-normalized"
