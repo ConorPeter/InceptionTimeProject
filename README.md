@@ -78,6 +78,13 @@ The `results (baseline)/` folder contains the baseline reproduction run used for
 
 Each improvement experiment is saved to its own results folder (e.g. `results_improvement_1/`) so baseline results are never overwritten. To run an experiment against a different output directory, update `tmp_output_directory` in `inception/main.py` before training.
 
+For the `improvement/augmentation` branch, the current experiment setup in [inception/main.py](/c:/Users/conor/Desktop/InceptionTimeProject/inception/main.py) is:
+
+- `100` epochs for the first screening run
+- `20%` validation split taken from the training set
+- jitter augmentation applied to the training split only
+- results written to auto-numbered folders like `results_augmentation_1/`
+
 ---
 
 ## Hyperparameter experiments

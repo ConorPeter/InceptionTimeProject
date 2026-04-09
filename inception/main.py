@@ -10,13 +10,22 @@ import os
 import re
 import sys
 import sklearn
+from sklearn.model_selection import train_test_split
+
+
+VALIDATION_SPLIT = 0.2
+RANDOM_STATE = 42
+EXPERIMENT_NB_EPOCHS = 500
+RESULTS_DIR_PREFIX = 'results_augmentation'
+APPLY_JITTER_AUGMENTATION = True
+JITTER_NOISE_STD_RATIO = 0.03
 
 
 def get_next_results_dir(root_dir):
-    pattern = re.compile(r'^results_improvement_(\d+)$')
+    pattern = re.compile(r'^{}_(\d+)$'.format(re.escape(RESULTS_DIR_PREFIX)))
     nums = [int(pattern.match(d).group(1)) for d in os.listdir(root_dir) if pattern.match(d)]
     next_num = max(nums) + 1 if nums else 1
-    return os.path.join(root_dir, f'results_improvement_{next_num}')
+    return os.path.join(root_dir, f'{RESULTS_DIR_PREFIX}_{next_num}')
 
 
 TARGET_DATASETS = ['GunPoint', 'ECG200', 'FordA']
@@ -65,6 +74,31 @@ def prepare_data():
     return x_train, y_train, x_test, y_test, y_true, nb_classes, y_true_train, enc
 
 
+def split_train_validation(x_train, y_train):
+    y_train_labels = np.argmax(y_train, axis=1)
+
+    x_train_split, x_val_split, y_train_split, y_val_split = train_test_split(
+        x_train,
+        y_train,
+        test_size=VALIDATION_SPLIT,
+        random_state=RANDOM_STATE,
+        stratify=y_train_labels
+    )
+
+    return x_train_split, y_train_split, x_val_split, y_val_split
+
+
+def apply_jitter_augmentation(x_train, y_train):
+    signal_std = np.std(x_train)
+    noise_std = signal_std * JITTER_NOISE_STD_RATIO
+    rng = np.random.RandomState(RANDOM_STATE)
+    noise = rng.normal(loc=0.0, scale=noise_std, size=x_train.shape)
+    x_train_augmented = np.concatenate((x_train, x_train + noise), axis=0)
+    y_train_augmented = np.concatenate((y_train, y_train), axis=0)
+
+    return x_train_augmented, y_train_augmented
+
+
 def fit_classifier():
     input_shape = x_train.shape[1:]
 
@@ -75,7 +109,15 @@ def fit_classifier():
         output_directory
     )
 
-    classifier.fit(x_train, y_train, x_test, y_test, y_true)
+    classifier.fit(
+        x_train,
+        y_train,
+        x_val,
+        y_val,
+        x_test,
+        y_test,
+        y_true
+    )
 
 
 def create_classifier(classifier_name, input_shape, nb_classes, output_directory,
@@ -86,7 +128,14 @@ def create_classifier(classifier_name, input_shape, nb_classes, output_directory
                                   nb_classes, verbose)
     if classifier_name == 'inception':
         from classifiers import inception
-        return inception.Classifier_INCEPTION(output_directory, input_shape, nb_classes, verbose=True, build=build)
+        return inception.Classifier_INCEPTION(
+            output_directory,
+            input_shape,
+            nb_classes,
+            verbose=True,
+            build=build,
+            nb_epochs=EXPERIMENT_NB_EPOCHS
+        )
     raise ValueError('Unknown classifier_name: {}'.format(classifier_name))
 
 
@@ -137,6 +186,10 @@ if sys.argv[1] == 'InceptionTime':
             print('==============================')
 
             x_train, y_train, x_test, y_test, y_true, nb_classes, y_true_train, enc = prepare_data()
+            x_train, y_train, x_val, y_val = split_train_validation(x_train, y_train)
+
+            if APPLY_JITTER_AUGMENTATION:
+                x_train, y_train = apply_jitter_augmentation(x_train, y_train)
 
             output_directory = tmp_output_directory + dataset_name + '/'
 
@@ -185,6 +238,10 @@ elif sys.argv[1] == 'InceptionTime_xp':
 
                     print('\t\t\tdataset_name', dataset_name)
                     x_train, y_train, x_test, y_test, y_true, nb_classes, y_true_train, enc = prepare_data()
+                    x_train, y_train, x_val, y_val = split_train_validation(x_train, y_train)
+
+                    if APPLY_JITTER_AUGMENTATION:
+                        x_train, y_train = apply_jitter_augmentation(x_train, y_train)
 
                     temp_output_directory = create_directory(output_directory)
 
@@ -202,10 +259,19 @@ elif sys.argv[1] == 'InceptionTime_xp':
                         nb_classes,
                         verbose=False,
                         build=True,
+                        nb_epochs=EXPERIMENT_NB_EPOCHS,
                         **kwargs
                     )
 
-                    classifier.fit(x_train, y_train, x_test, y_test, y_true)
+                    classifier.fit(
+                        x_train,
+                        y_train,
+                        x_val,
+                        y_val,
+                        x_test,
+                        y_test,
+                        y_true
+                    )
 
                     create_directory(output_directory + '/DONE')
 
