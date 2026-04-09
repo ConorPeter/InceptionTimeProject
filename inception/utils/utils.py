@@ -196,7 +196,8 @@ def save_logs(output_directory, hist, y_pred, y_true, duration,
     df_metrics = calculate_metrics(y_true, y_pred, duration)
     df_metrics.to_csv(output_directory + 'df_metrics.csv', index=False)
 
-    index_best_model = hist_df['loss'].idxmin()
+    best_metric = 'val_loss' if plot_test_acc and 'val_loss' in hist_df.columns else 'loss'
+    index_best_model = hist_df[best_metric].idxmin()
     row_best_model = hist_df.loc[index_best_model]
 
     train_acc_key = 'acc' if 'acc' in row_best_model.index else 'accuracy'
