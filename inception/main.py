@@ -7,8 +7,16 @@ from utils.utils import generate_results_csv
 
 import numpy as np
 import os
+import re
 import sys
 import sklearn
+
+
+def get_next_results_dir(root_dir):
+    pattern = re.compile(r'^results_improvement_(\d+)$')
+    nums = [int(pattern.match(d).group(1)) for d in os.listdir(root_dir) if pattern.match(d)]
+    next_num = max(nums) + 1 if nums else 1
+    return os.path.join(root_dir, f'results_improvement_{next_num}')
 
 
 TARGET_DATASETS = ['GunPoint', 'ECG200', 'FordA']
@@ -121,7 +129,7 @@ if sys.argv[1] == 'InceptionTime':
         if iter != 0:
             trr = '_itr_' + str(iter)
 
-        tmp_output_directory = root_dir + '/results/'
+        tmp_output_directory = get_next_results_dir(root_dir) + '/'
         
         for dataset_name in TARGET_DATASETS:
             print('\n==============================')
