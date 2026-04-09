@@ -11,7 +11,8 @@ from utils.utils import save_test_duration
 class Classifier_INCEPTION:
 
     def __init__(self, output_directory, input_shape, nb_classes, verbose=False, build=True, batch_size=64,
-                 nb_filters=32, use_residual=True, use_bottleneck=True, depth=6, kernel_size=41, nb_epochs=500):
+                 nb_filters=32, use_residual=True, use_bottleneck=True, depth=6, kernel_size=41, nb_epochs=500,
+                 dropout_rate=0.0):
 
         self.output_directory = output_directory
 
@@ -24,6 +25,7 @@ class Classifier_INCEPTION:
         self.batch_size = batch_size
         self.bottleneck_size = 32
         self.nb_epochs = nb_epochs
+        self.dropout_rate = dropout_rate
 
         if build == True:
             self.model = self.build_model(input_shape, nb_classes)
@@ -86,6 +88,8 @@ class Classifier_INCEPTION:
                 input_res = x
 
         gap_layer = keras.layers.GlobalAveragePooling1D()(x)
+        if self.dropout_rate > 0.0:
+            gap_layer = keras.layers.Dropout(rate=self.dropout_rate)(gap_layer)
 
         output_layer = keras.layers.Dense(nb_classes, activation='softmax')(gap_layer)
 
@@ -94,27 +98,25 @@ class Classifier_INCEPTION:
         model.compile(loss='categorical_crossentropy', optimizer=keras.optimizers.Adam(),
                       metrics=['accuracy'])
 
-        reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='loss', factor=0.5, patience=50,
+        reduce_lr = keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.5, patience=50,
                                                       min_lr=0.0001)
 
         file_path = self.output_directory + 'best_model.hdf5'
 
-        model_checkpoint = keras.callbacks.ModelCheckpoint(filepath=file_path, monitor='loss',
+        model_checkpoint = keras.callbacks.ModelCheckpoint(filepath=file_path, monitor='val_loss',
                                                            save_best_only=True)
 
         self.callbacks = [reduce_lr, model_checkpoint]
 
         return model
 
-    def fit(self, x_train, y_train, x_val, y_val, y_true, plot_test_acc=False):
+    def fit(self, x_train, y_train, x_val, y_val, x_test, y_test, y_true):
         # Allow CPU fallback instead of hard exiting when no GPU is found
         try:
             if len(keras.backend.tensorflow_backend._get_available_gpus()) == 0:
                 print('no gpu detected, continuing on cpu')
         except Exception:
             print('gpu check failed, continuing on cpu')
-
-        # x_val and y_val are only used to monitor the test loss and NOT for training
 
         if self.batch_size is None:
             mini_batch_size = int(min(x_train.shape[0] / 10, 16))
@@ -123,30 +125,21 @@ class Classifier_INCEPTION:
 
         start_time = time.time()
 
-        if plot_test_acc:
-            hist = self.model.fit(
-                x_train, y_train,
-                batch_size=mini_batch_size,
-                epochs=self.nb_epochs,
-                verbose=1,
-                validation_data=(x_val, y_val),
-                callbacks=self.callbacks
-            )
-        else:
-            hist = self.model.fit(
-                x_train, y_train,
-                batch_size=mini_batch_size,
-                epochs=self.nb_epochs,
-                verbose=1,
-                callbacks=self.callbacks
-            )
+        hist = self.model.fit(
+            x_train, y_train,
+            batch_size=mini_batch_size,
+            epochs=self.nb_epochs,
+            verbose=1,
+            validation_data=(x_val, y_val),
+            callbacks=self.callbacks
+        )
 
         duration = time.time() - start_time
 
         self.model.save(self.output_directory + 'last_model.hdf5')
 
         y_pred = self.predict(
-            x_val, y_true, x_train, y_train, y_val,
+            x_test, y_true, x_train, y_train, y_test,
             return_df_metrics=False
         )
 
@@ -158,7 +151,7 @@ class Classifier_INCEPTION:
 
         df_metrics = save_logs(
             self.output_directory, hist, y_pred, y_true, duration,
-            plot_test_acc=plot_test_acc
+            plot_test_acc=True
         )
 
         keras.backend.clear_session()
