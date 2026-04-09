@@ -1,6 +1,6 @@
-# InceptionTime Reproduction
+# InceptionTime Reproduction & Improvement
 
-Reproduction of **InceptionTime: Finding AlexNet for Time Series Classification** (Fawaz et al., 2020) as part of a university reproducibility project.
+Reproduction and improvement of **InceptionTime: Finding AlexNet for Time Series Classification** (Fawaz et al., 2020) as part of a university reproducibility project.
 
 Original paper repo: https://github.com/hfawaz/InceptionTime
 
@@ -8,20 +8,20 @@ Original paper repo: https://github.com/hfawaz/InceptionTime
 
 ## What this is
 
-InceptionTime is a deep learning model for time series classification that adapts Google's Inception architecture to 1D temporal data. This repo reproduces the core architecture and trains it on three datasets from the UCR Archive: GunPoint, ECG200, and FordA.
+InceptionTime applies Google's Inception architecture to 1D time series classification. This repo reproduces the core model and trains it on three UCR Archive datasets. We also test several improvements aimed at reducing overfitting on small datasets.
 
 ---
 
-## First time setup
+## Setup
 
-Open **Anaconda Prompt** and run:
+Open Anaconda Prompt and run:
 
 ```bash
 conda create -n inception_env python=3.7
 conda activate inception_env
 ```
 
-Navigate to the project folder (change the path to wherever you cloned it):
+Navigate to the project folder:
 
 ```bash
 cd C:\path\to\InceptionTimeProject
@@ -29,80 +29,95 @@ pip install numpy==1.18.5
 pip install -r requirements.txt
 ```
 
-> Install numpy first - other packages need it to build correctly on Windows.
+Install numpy before the other packages or the build will fail on Windows.
 
-Then move into the inception folder and run training:
+The original codebase targets TensorFlow 1.x. TensorFlow 2.x will not work.
+
+---
+
+## Reproducing the baseline
+
+Switch to the main branch and run:
 
 ```bash
+git checkout main
 cd inception
 python main.py InceptionTime
 ```
 
-> The original code was written for TensorFlow 1.x - TensorFlow 2.x will not work without modifications.
+Results are saved to a new folder containing:
+
+- `df_metrics.csv` - final test accuracy, precision, recall, training duration
+- `history.csv` - loss and accuracy per epoch
+- `best_model.hdf5` - best checkpoint by val loss (not tracked by git)
 
 ---
 
-## Training times (CPU, single model, 1500 epochs)
+## Running the improvement experiments
 
-These are approximate times on a standard laptop CPU:
+Each experiment is on its own branch. Switch to the relevant branch and run the same command:
 
-| Dataset  | Training Samples | Time    |
-| -------- | ---------------- | ------- |
-| GunPoint | 50               | ~10 min |
-| ECG200   | 100              | ~10 min |
-| FordA    | 3,200            | ~70 min |
+| Branch                       | Experiment                           |
+| ---------------------------- | ------------------------------------ |
+| `improvement/augmentation`   | Jitter data augmentation             |
+| `improvement/dropout`        | Dropout regularisation               |
+| `improvement/early-stopping` | Early stopping                       |
+| `improvement/kernel-forda`   | Larger kernel size for FordA         |
+| `improvement/combined`       | Augmentation + Dropout (final model) |
 
-FordA is significantly longer due to its training set being 64x larger than GunPoint.
+```bash
+git checkout improvement/combined
+cd inception
+python main.py InceptionTime
+```
+
+Each branch writes to its own results folder so nothing gets overwritten.
 
 ---
 
 ## Results
 
-Results are saved to `results/<dataset>/` after training:
+### Baseline vs paper
 
-- `df_metrics.csv` - final test accuracy, precision, recall, and training duration
-- `history.csv` - loss and accuracy per epoch
-- `best_model.hdf5` - saved model weights (not tracked by git)
+| Dataset  | Our Baseline | Epochs | Paper (ensemble of 5) |
+| -------- | ------------ | ------ | --------------------- |
+| GunPoint | 0.9933       | 1500   | 0.990                 |
+| ECG200   | 0.9200       | 1500   | 0.880                 |
+| FordA    | 0.9561       | 50     | 0.960                 |
 
-### Baseline results
+### Final combined model vs paper
 
-The `results (baseline)/` folder contains the baseline reproduction run used for comparison throughout this project. These are the reference numbers for the improvement experiments.
+| Dataset  | Combined Model (1500 epochs) | Paper (ensemble of 5) | Difference |
+| -------- | ---------------------------- | --------------------- | ---------- |
+| GunPoint | 0.9933                       | 0.990                 | +0.003     |
+| ECG200   | 0.9100                       | 0.880                 | +0.030     |
 
-| Dataset  | Baseline Accuracy | Paper (ensemble of 5) |
-| -------- | :---------------: | :-------------------: |
-| GunPoint |       0.993       |         0.990         |
-| ECG200   |       0.920       |         0.880         |
-| FordA    |       0.956       |         0.960         |
-
-### Improvement experiments
-
-Each improvement experiment is saved to its own results folder (e.g. `results_improvement_1/`) so baseline results are never overwritten. To run an experiment against a different output directory, update `tmp_output_directory` in `inception/main.py` before training.
+The combined model matches or exceeds the paper's 5-model ensemble on both small datasets using a single model.
 
 ---
 
-## Hyperparameter experiments
+## Training times (CPU only, single model)
 
-To run the hyperparameter sweep (batch size, filters, depth, kernel size etc.):
+| Dataset  | Baseline               | Combined (1500 epochs) |
+| -------- | ---------------------- | ---------------------- |
+| GunPoint | ~16 min (1500 epochs)  | ~32 min                |
+| ECG200   | ~20 min (1500 epochs)  | ~41 min                |
+| FordA    | ~70 min (50 epochs)    | not run                |
 
-```bash
-cd inception
-python main.py InceptionTime_xp
-```
+Combined takes roughly twice as long because augmentation doubles the training set size each epoch.
 
 ---
 
 ## Deviations from the paper
 
-A few things we had to change due to hardware constraints:
-
 | Original              | Our setup            | Why                              |
 | --------------------- | -------------------- | -------------------------------- |
-| 5-model ensemble      | Single model         | CPU only - training time         |
+| 5-model ensemble      | Single model         | CPU only, training time          |
 | TensorFlow 1.12 + GPU | TensorFlow 1.15, CPU | CUDA version mismatch on Windows |
 | 85 UCR datasets       | 3 datasets           | Computational constraints        |
 | Linux                 | Windows 10           | Local hardware                   |
 
-See `logs/methodology.md` for more detail.
+See `logs/methodology.md` for full details.
 
 ---
 
@@ -111,19 +126,23 @@ See `logs/methodology.md` for more detail.
 ```
 InceptionTimeProject/
 ├── inception/
-│   ├── main.py
+│   ├── main.py                   - training entry point
 │   ├── classifiers/
-│   │   ├── inception.py
-│   │   └── nne.py
+│   │   └── inception.py          - InceptionTime model
 │   └── utils/
 ├── data/
 │   ├── GunPoint/
 │   ├── ECG200/
 │   └── FordA/
-├── results/                  - your most recent training run
-├── results (baseline)/        - baseline results used for comparison
+├── results_baseline(1500ep)/     - baseline reproduction (1500 epoch run)
+├── results_baseline(500ep)/      - baseline at 500 epochs (screening reference)
+├── results_augmentation/         - jitter augmentation experiment
+├── results_dropout/              - dropout experiment
+├── results_early_stopping/       - early stopping experiment
+├── results_kernel_forda/         - larger kernel size experiment (FordA only)
+├── results_combined/             - final combined model (augmentation + dropout)
 ├── logs/
-│   └── methodology.md
+│   └── methodology.md            - deviations and setup notes
 └── requirements.txt
 ```
 
@@ -131,4 +150,4 @@ InceptionTimeProject/
 
 ## Reference
 
-Fawaz et al. (2020). InceptionTime: Finding AlexNet for time series classification. _Data Mining and Knowledge Discovery_, 34(6), 1936-1962.
+Fawaz et al. (2020). InceptionTime: Finding AlexNet for time series classification. Data Mining and Knowledge Discovery, 34(6), 1936-1962.
