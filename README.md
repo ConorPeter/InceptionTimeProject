@@ -38,33 +38,45 @@ cd inception
 python main.py InceptionTime
 ```
 
-Training runs on CPU and takes a while - roughly 2 hours for GunPoint, longer for FordA. Results are saved to `results/<dataset>/` as they finish.
-
 > The original code was written for TensorFlow 1.x - TensorFlow 2.x will not work without modifications.
 
 ---
 
-## Re-running from scratch
+## Training times (CPU, single model, 1500 epochs)
 
-The script skips any dataset that already has a results folder. To retrain from scratch, delete the results folder first:
+These are approximate times on a standard laptop CPU:
 
-```bash
-cd C:\path\to\InceptionTimeProject
-rmdir /s /q results
-cd inception
-python main.py InceptionTime
-```
+| Dataset  | Training Samples | Time    |
+| -------- | ---------------- | ------- |
+| GunPoint | 50               | ~10 min |
+| ECG200   | 100              | ~10 min |
+| FordA    | 3,200            | ~70 min |
+
+FordA is significantly longer due to its training set being 64x larger than GunPoint.
 
 ---
 
 ## Results
 
 Results are saved to `results/<dataset>/` after training:
-- `df_metrics.csv` - final test accuracy
+
+- `df_metrics.csv` - final test accuracy, precision, recall, and training duration
 - `history.csv` - loss and accuracy per epoch
 - `best_model.hdf5` - saved model weights (not tracked by git)
 
-Previous saved runs are kept in `results_baseline/` for comparison.
+### Baseline results
+
+The `results (baseline)/` folder contains the baseline reproduction run used for comparison throughout this project. These are the reference numbers for the improvement experiments.
+
+| Dataset  | Baseline Accuracy | Paper (ensemble of 5) |
+| -------- | :---------------: | :-------------------: |
+| GunPoint |       0.993       |         0.990         |
+| ECG200   |       0.920       |         0.880         |
+| FordA    |       0.956       |         0.960         |
+
+### Improvement experiments
+
+Each improvement experiment is saved to its own results folder (e.g. `results_improvement_1/`) so baseline results are never overwritten. To run an experiment against a different output directory, update `tmp_output_directory` in `inception/main.py` before training.
 
 ---
 
@@ -83,12 +95,12 @@ python main.py InceptionTime_xp
 
 A few things we had to change due to hardware constraints:
 
-| Original | Our setup | Why |
-|----------|-----------|-----|
-| 5-model ensemble | Single model | CPU only - training time |
+| Original              | Our setup            | Why                              |
+| --------------------- | -------------------- | -------------------------------- |
+| 5-model ensemble      | Single model         | CPU only - training time         |
 | TensorFlow 1.12 + GPU | TensorFlow 1.15, CPU | CUDA version mismatch on Windows |
-| 85 UCR datasets | 3 datasets | Computational constraints |
-| Linux | Windows 10 | Local hardware |
+| 85 UCR datasets       | 3 datasets           | Computational constraints        |
+| Linux                 | Windows 10           | Local hardware                   |
 
 See `logs/methodology.md` for more detail.
 
@@ -108,8 +120,8 @@ InceptionTimeProject/
 │   ├── GunPoint/
 │   ├── ECG200/
 │   └── FordA/
-├── results/                  - generated after training
-├── results (Kasturi)/        - saved results from initial reproduction run
+├── results/                  - your most recent training run
+├── results (baseline)/        - baseline results used for comparison
 ├── logs/
 │   └── methodology.md
 └── requirements.txt
@@ -119,4 +131,4 @@ InceptionTimeProject/
 
 ## Reference
 
-Fawaz et al. (2020). InceptionTime: Finding AlexNet for time series classification. *Data Mining and Knowledge Discovery*, 34(6), 1936-1962.
+Fawaz et al. (2020). InceptionTime: Finding AlexNet for time series classification. _Data Mining and Knowledge Discovery_, 34(6), 1936-1962.
